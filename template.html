@@ -1,0 +1,578 @@
+<title>Provenance Bench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow reading column with a tab strip. Tables and charts scroll inside their own boxes. */
+:root {
+  --bg: #F2F5F8; --surface: #FFFFFF; --soft: #E8EEF3; --ink: #14202B; --ink2: #3E4C5A; --muted: #5F7182;
+  --line: #D3DBE3; --accent: #0B6E5E; --accent-ink: #FFFFFF; --attack: #B8420F; --bad: #B3261E; --ok: #0B7A5B;
+  --m-none: #6B7886; --m-pagerank: #2A78D6; --m-consensus: #EB6834; --m-truth: #1BAF7A; --m-audit: #EDA100; --m-anchored: #E87BA4;
+  --c-bound: #2A78D6; --c-bindable: #1BAF7A; --c-vague: #EDA100; --c-opinion: #8793A0;
+  --display: "Familjen Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E151B; --surface: #151E26; --soft: #1C2832; --ink: #E8EEF3; --ink2: #C0CCD6; --muted: #8FA1B1;
+    --line: #2A3945; --accent: #4FD1B8; --accent-ink: #0E151B; --attack: #FF9C6B; --bad: #FF8A80; --ok: #4FD1A0;
+    --m-none: #9AA7B4; --m-pagerank: #3987E5; --m-consensus: #D95926; --m-truth: #199E70; --m-audit: #C98500; --m-anchored: #D55181;
+    --c-bound: #3987E5; --c-bindable: #199E70; --c-vague: #C98500; --c-opinion: #7C8996;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E151B; --surface: #151E26; --soft: #1C2832; --ink: #E8EEF3; --ink2: #C0CCD6; --muted: #8FA1B1;
+  --line: #2A3945; --accent: #4FD1B8; --accent-ink: #0E151B; --attack: #FF9C6B; --bad: #FF8A80; --ok: #4FD1A0;
+  --m-none: #9AA7B4; --m-pagerank: #3987E5; --m-consensus: #D95926; --m-truth: #199E70; --m-audit: #C98500; --m-anchored: #D55181;
+  --c-bound: #3987E5; --c-bindable: #199E70; --c-vague: #C98500; --c-opinion: #7C8996;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  padding-block: 0 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5.5vw, 44px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: clamp(22px, 3.4vw, 28px); font-weight: 600; letter-spacing: -0.005em; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0 0 12px; max-width: 68ch; }
+.muted { color: var(--muted); }
+.mono { font-family: var(--mono); font-size: 0.92em; }
+header.top { padding-top: 28px; padding-bottom: 10px; }
+.kicker { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.lede { font-size: 17px; color: var(--ink2); margin-top: 12px; max-width: 62ch; }
+nav.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--line); margin-top: 22px; scrollbar-width: thin; }
+nav.tabs a { white-space: nowrap; padding: 10px 14px; text-decoration: none; color: var(--muted); font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+nav.tabs a:hover { color: var(--ink); }
+nav.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--accent); }
+section.view { display: none; padding-top: 26px; }
+section.view.on { display: block; }
+.block { margin-top: 38px; }
+.block > h2 { margin-bottom: 8px; }
+.qtag { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.scroll { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--ink2); font-size: 13px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+td.heat { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 84px; }
+.h0 { background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+.h1 { background: color-mix(in srgb, var(--accent) 15%, var(--surface)); }
+.h2 { background: color-mix(in srgb, var(--accent) 30%, var(--surface)); }
+.h3 { background: color-mix(in srgb, var(--accent) 45%, var(--surface)); }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 14px; margin: 14px 0; color: var(--ink2); max-width: 68ch; }
+.caveat { border-left: 3px solid var(--attack); padding: 4px 0 4px 14px; margin: 14px 0; color: var(--ink2); max-width: 68ch; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 22px; }
+.two > * { min-width: 0; }
+.stat { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 14px 0; }
+.stat div { min-width: 0; }
+.stat b { display: block; font-family: var(--display); font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; margin-bottom: 14px; }
+.controls label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink2); min-width: 0; }
+select, input[type="range"], textarea, button { font: inherit; color: inherit; }
+select, textarea { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; max-width: 100%; }
+textarea { width: 100%; min-height: 200px; resize: vertical; font-family: var(--sans); line-height: 1.5; }
+button { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; cursor: pointer; font-weight: 500; }
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button[disabled] { opacity: 0.55; cursor: default; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; border-radius: 0; border-right: 1px solid var(--line); padding: 7px 11px; font-size: 13px; background: transparent; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.legend li { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.legend .sw { width: 22px; height: 0; border-top: 3px solid var(--m-none); flex: none; }
+.legend .sw.dash { border-top-style: dashed; }
+.chartbox { position: relative; }
+.chartbox svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font-size: 12.5px; box-shadow: 0 4px 14px rgba(0,0,0,0.12); min-width: 190px; z-index: 3; }
+.tip b { font-family: var(--display); }
+.tip .r { display: flex; justify-content: space-between; gap: 14px; font-variant-numeric: tabular-nums; }
+.tip .r i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+details { margin-top: 12px; }
+summary { cursor: pointer; color: var(--ink2); font-weight: 500; }
+.chip { display: inline-block; font-family: var(--mono); font-size: 11.5px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink2); white-space: nowrap; background: var(--surface); }
+.chip.c-bound { border-color: var(--c-bound); } .chip.c-bindable { border-color: var(--c-bindable); }
+.chip.c-vague { border-color: var(--c-vague); } .chip.c-opinion { border-color: var(--c-opinion); } .chip.c-procedural { border-style: dashed; }
+.chip.insider { border-color: var(--attack); color: var(--attack); }
+.stack { display: flex; height: 22px; border-radius: 4px; overflow: hidden; gap: 2px; background: var(--surface); }
+.stack > span { display: block; height: 100%; min-width: 3px; }
+.stack .s-bound { background: var(--c-bound); } .stack .s-bindable { background: var(--c-bindable); }
+.stack .s-vague { background: var(--c-vague); } .stack .s-opinion { background: var(--c-opinion); }
+.keyline { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink2); margin-top: 8px; }
+.keyline i { width: 10px; height: 10px; display: inline-block; border-radius: 2px; margin-right: 5px; }
+.rec { display: grid; grid-template-columns: 34px minmax(86px, 104px) 1fr; gap: 4px 12px; padding: 9px 10px; border-bottom: 1px solid var(--line); align-items: start; }
+.rec > * { min-width: 0; }
+.rec .sq { font-family: var(--mono); color: var(--muted); }
+.rec .tx { overflow-wrap: anywhere; }
+.rec .hs { grid-column: 3; font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.rec.bad { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border-left: 3px solid var(--bad); }
+.rec .why { grid-column: 3; color: var(--bad); font-size: 13px; }
+.verdict { padding: 10px 14px; border-radius: 6px; border: 1px solid var(--line); margin: 12px 0; background: var(--surface); }
+.verdict.bad { border-color: var(--bad); } .verdict.pass { border-color: var(--ok); } .verdict.slip { border-color: var(--attack); }
+.verdict b { font-family: var(--display); }
+.yes::before { content: "\2713\00a0"; } .no::before { content: "\2717\00a0"; }
+td.yes { color: var(--ok); font-weight: 600; text-align: center; } td.no { color: var(--muted); text-align: center; }
+.sent { display: grid; grid-template-columns: 96px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sent > * { min-width: 0; }
+.sent span:last-child { overflow-wrap: anywhere; }
+.foot { margin-top: 48px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); max-width: 68ch; }
+ul.tight { margin: 0 0 12px; padding-left: 20px; max-width: 68ch; } ul.tight li { margin-bottom: 6px; }
+@media (max-width: 520px) { .rec { grid-template-columns: 28px 1fr; } .rec .tx, .rec .hs, .rec .why { grid-column: 1 / -1; } .sent { grid-template-columns: 1fr; gap: 2px; } }
+@media (prefers-reduced-motion: no-preference) { section.view.on { animation: fade 0.18s ease-out; } @keyframes fade { from { opacity: 0.4; } to { opacity: 1; } } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="kicker">AI for epistemics sprint · Trust infrastructure track</div>
+  <h1>Provenance Bench</h1>
+  <p class="lede">Three small prototypes that each answer one question from the track: how hard source scores are to cheat, what keeps agent records honest, and how much text can be tied to evidence. Every number here comes from code that runs inside this page.</p>
+  <nav class="tabs" id="tabs" aria-label="Sections">
+    <a href="#findings">Findings</a><a href="#arena">Arena</a><a href="#ledger">Ledger</a><a href="#meter">Evidence meter</a><a href="#method">Method</a>
+  </nav>
+</header>
+
+<!-- FINDINGS -->
+<section class="view" id="v-findings" aria-label="Findings">
+  <div class="block" style="margin-top:0">
+    <div class="qtag">Track question 1 and 3</div>
+    <h2>Citation rank and truth discovery can leave an agent worse off than no score</h2>
+    <p id="f-q1-intro"></p>
+    <div class="panel scroll"><table id="f-heat"></table></div>
+    <p class="muted" style="margin-top:8px;font-size:13px">Cells show the smallest number of Sybil sources that pushes accuracy on the targeted claims below 50 percent. Darker means harder to cheat. Sweep: 0, 8, 16, 32, 64, 128 Sybils, 30 seeds each.</p>
+    <div id="f-q1-points"></div>
+    <h3 style="margin-top:26px">Does using the tool help the agent that consumes it?</h3>
+    <p id="f-q3-intro"></p>
+    <div class="panel scroll"><table id="f-delta"></table></div>
+    <div class="caveat">The consuming agent here is a weighted vote, not a language model. Whether real model agents behave the same way is untested. The Method tab describes the experiment that would test it.</div>
+  </div>
+
+  <div class="block">
+    <div class="qtag">Track question 2</div>
+    <h2>Four additions make agent records auditable, with one gap left</h2>
+    <p id="f-q2-intro"></p>
+    <div class="panel scroll"><table id="f-matrix"></table></div>
+    <div id="f-q2-points"></div>
+  </div>
+
+  <div class="block">
+    <div class="qtag">Track question 4</div>
+    <h2>A first evidence-coverage meter, tried on invented text</h2>
+    <p id="f-q4-intro"></p>
+    <div class="panel" id="f-meter"></div>
+    <div class="caveat" id="f-q4-caveat"></div>
+  </div>
+
+  <div class="block">
+    <h2>What would make this real</h2>
+    <ul class="tight">
+      <li>Run the evidence meter over a real corpus (a year of council minutes, a health site, a news feed) and compare its labels with human labels on a few hundred sentences.</li>
+      <li>Replace the weighted-vote aggregator with language-model agents that read the scores, then repeat the Sybil sweep.</li>
+      <li>Give the ledger a real witness: a small service that signs checkpoints and refuses to sign two different heads for the same position.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ARENA -->
+<section class="view" id="v-arena" aria-label="Arena">
+  <h2>Cheating arena</h2>
+  <p>Fifty honest sources answer true or false on 300 claims. An attacker adds Sybil sources that all give the wrong answer on 30 targeted claims. Each scoring method turns the sources into weights, and a weighted vote decides each claim. The chart tracks how often the vote is right on the targeted claims as Sybils are added.</p>
+  <div class="controls">
+    <label>Attack
+      <select id="a-attack"></select>
+    </label>
+    <label>Audit budget: <span id="a-audit-v" class="mono">40</span> claims
+      <input type="range" id="a-audit" min="10" max="160" step="10" value="40">
+    </label>
+    <button id="a-run" class="primary" type="button">Run live (12 seeds)</button>
+    <span id="a-status" class="muted" role="status"></span>
+  </div>
+  <p id="a-desc" class="muted" style="font-size:13.5px"></p>
+  <div class="panel">
+    <div class="chartbox" id="a-chart"></div>
+    <ul class="legend" id="a-legend"></ul>
+    <details><summary>Table view</summary><div class="scroll" style="margin-top:8px"><table id="a-table"></table></div></details>
+  </div>
+  <p class="muted" style="font-size:13px;margin-top:10px" id="a-note"></p>
+</section>
+
+<!-- LEDGER -->
+<section class="view" id="v-ledger" aria-label="Ledger">
+  <h2>Agent ledger</h2>
+  <p>A buyer agent records what it saw and did. The seller agent co-signs the agreement, and a witness signs checkpoints. Pick an attack, then choose how many protections the verifier has. Everything below uses real ECDSA signatures and SHA-256 in your browser.</p>
+  <div class="controls">
+    <label>Attack
+      <select id="l-attack"></select>
+    </label>
+    <button id="l-apply" class="primary" type="button">Apply attack</button>
+    <button id="l-reset" type="button">Reset</button>
+    <button id="l-anchor" type="button">Witness checkpoint now</button>
+  </div>
+  <div class="controls" style="margin-bottom:4px">
+    <div><div class="muted" style="font-size:13px;margin-bottom:4px">Verifier checks</div><div class="seg" id="l-layers" role="group" aria-label="Verifier checks"></div></div>
+  </div>
+  <div id="l-verdict" class="verdict" role="status"></div>
+  <div class="panel" style="padding:0"><div id="l-chain"></div></div>
+  <p class="muted" style="font-size:13px;margin-top:8px" id="l-receipts"></p>
+  <p class="muted" style="font-size:13px">An insider holds the log owner's signing key, so re-signing a rewritten chain is possible for them. An outsider has no key.</p>
+  <h3 style="margin-top:26px">All attacks against all verifiers</h3>
+  <div class="panel scroll"><table id="l-matrix"></table></div>
+  <div class="controls" style="margin-top:12px"><button id="l-rerun" type="button">Re-run every check in this browser</button><span id="l-rerun-status" class="muted" role="status"></span></div>
+</section>
+
+<!-- METER -->
+<section class="view" id="v-meter" aria-label="Evidence meter">
+  <h2>Evidence meter</h2>
+  <p>Paste any text, or pick a specimen. The meter splits it into sentences and sorts each one by how far it can be tied to checkable evidence. It reads the wording only. It does not fetch or verify anything.</p>
+  <div class="controls">
+    <label>Text
+      <select id="m-pick"></select>
+    </label>
+  </div>
+  <textarea id="m-text" aria-label="Text to analyze" spellcheck="false"></textarea>
+  <div class="panel" style="margin-top:14px" id="m-out"></div>
+  <details open><summary>How the sorting works</summary>
+    <ul class="tight" style="margin-top:8px">
+      <li><b>Evidence attached</b> means the sentence carries a pointer a machine can follow: a link, a document number, a citation, or a named source with "according to".</li>
+      <li><b>Checkable, no pointer</b> means the sentence has figures or a named person or body, so evidence could be looked up, but nothing in the text says where.</li>
+      <li><b>Too vague to bind</b> means a general claim with no figures or names.</li>
+      <li><b>Opinion or forecast</b> means a value judgement, a hedge, or a prediction, which cannot be checked against a record today.</li>
+      <li>Procedural lines such as "meeting adjourned" are left out of the percentages.</li>
+    </ul>
+    <div class="caveat" id="m-valid"></div>
+  </details>
+</section>
+
+<!-- METHOD -->
+<section class="view" id="v-method" aria-label="Method">
+  <h2>Method</h2>
+  <h3 style="margin-top:16px">The arena world</h3>
+  <p>Each honest source has a hidden accuracy between 0.55 and 0.92 and answers about half of the claims. Honest sources cite other sources, preferring accurate ones. Sybils answer every targeted claim wrongly and answer other claims with the accuracy and copying behaviour of the chosen attack. Sybil sources cite each other, and honest sources link to them at a rate set by the attack. Targeted claims are 10 percent of all claims.</p>
+  <h3 style="margin-top:16px">Scoring methods</h3>
+  <ul class="tight">
+    <li><b>No tool.</b> Every source gets the same weight.</li>
+    <li><b>Citation rank.</b> PageRank over the citation graph.</li>
+    <li><b>Agreement with majority.</b> Weight rises with how often a source matches the plain majority.</li>
+    <li><b>Truth discovery.</b> Weights and verdicts are updated together for 10 rounds, so sources that agree with the current verdict gain weight.</li>
+    <li><b>Random audit.</b> Ground truth is checked on a random sample of claims, and each source is scored by the lower bound of its audited accuracy.</li>
+    <li><b>Targeted audit with independence.</b> Half the audit budget is random. The other half goes to the claims where the vote is most split. Sources that agree on at least 90 percent of 30 or more shared claims are grouped, and each group shares one voice.</li>
+  </ul>
+  <h3 style="margin-top:16px">Attacks</h3>
+  <ul class="tight" id="m-attacks"></ul>
+  <h3 style="margin-top:16px">Metrics and assumptions</h3>
+  <ul class="tight">
+    <li>The headline metric is accuracy of the weighted vote on the 30 targeted claims, averaged over 30 seeds. A tie counts as half right.</li>
+    <li>Audits assume ground truth can be obtained for the sampled claims. That is the expensive step in practice, and its cost is the budget slider.</li>
+    <li>Sybils always answer targeted claims while honest sources answer half of all claims. Reducing that gap would make every method look stronger.</li>
+    <li>Results depend on this world. The 90 percent grouping threshold and the 0.85 to 0.95 camouflage accuracies were set before the runs and not tuned afterwards.</li>
+  </ul>
+  <h3 style="margin-top:16px">Ledger design</h3>
+  <p>Each record holds a sequence number, the previous record's hash, a kind, a body, and an optional counterparty signature. The record hash covers all of that, and the agent signs the hash. The counterparty signs the record content, which includes the previous hash, so a co-signed agreement also pins everything before it. A witness signs the pair (position, head hash) and refuses a second head for a position it has already signed.</p>
+  <p id="m-perf"></p>
+  <h3 style="margin-top:16px">Reproducing</h3>
+  <p>The simulation, ledger and meter are plain scripts with seeded randomness. The build runs them in Node and writes the numbers shown in Findings. This page also runs the same code live, so the Arena and Ledger tabs can recompute results and compare them with the build.</p>
+  <h3 style="margin-top:16px">Next experiment: real agents</h3>
+  <p>Give language-model agents 300 claims with source answers, once with raw votes and once with each score attached. Add Sybils as in the arena and compare accuracy on the targeted claims. If an agent trusts a gameable score, the gap between the two arms will show it.</p>
+</section>
+
+<p class="foot">Built for the AI for epistemics research sprint. Specimen texts in the evidence meter are invented for illustration and are not real documents.</p>
+</div>
+
+<script>
+/*@@SRC@@*/
+/*@@RESULTS@@*/
+</script>
+<script>
+(function () {
+'use strict';
+const { arena, ledger, meter } = PB;
+const $ = (s, r) => (r || document).querySelector(s);
+const el = (tag, attrs, ...kids) => {
+  const n = document.createElement(tag);
+  if (attrs) for (const k of Object.keys(attrs)) {
+    if (k === 'class') n.className = attrs[k]; else if (k === 'html') n.innerHTML = attrs[k]; else n.setAttribute(k, attrs[k]);
+  }
+  for (const c of kids.flat()) if (c != null) n.append(c.nodeType ? c : document.createTextNode(c));
+  return n;
+};
+const f2 = x => x.toFixed(2);
+const pct = x => Math.round(x * 100) + '%';
+const KS = R.arena.Ks;
+const MID = arena.METHODS.map(m => m.id);
+const LABEL = {}; arena.METHODS.forEach(m => LABEL[m.id] = m.label);
+const COLORV = { none: 'var(--m-none)', pagerank: 'var(--m-pagerank)', consensus: 'var(--m-consensus)', truth: 'var(--m-truth)', audit: 'var(--m-audit)', anchored: 'var(--m-anchored)' };
+const ATK = Object.keys(arena.ATTACKS);
+const flipText = (v, ks) => v == null ? '>' + ks[ks.length - 1] : String(v);
+const level = v => v == null ? 3 : v <= 16 ? 0 : v <= 32 ? 1 : 2;
+
+/* ---------- routing ---------- */
+const TABS = ['findings', 'arena', 'ledger', 'meter', 'method'];
+function route() {
+  const h = (location.hash || '').replace('#', '');
+  const cur = TABS.includes(h) ? h : 'findings';
+  TABS.forEach(t => { $('#v-' + t).classList.toggle('on', t === cur); });
+  if (cur === 'arena' && typeof aState !== 'undefined' && aState.data) arenaRender();
+  document.querySelectorAll('#tabs a').forEach(a => { if (a.getAttribute('href') === '#' + cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+}
+window.addEventListener('hashchange', route);
+let rzT = null;
+window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(() => { if (typeof aState !== 'undefined' && aState.data && $('#v-arena').classList.contains('on')) arenaRender(); }, 150); });
+window.addEventListener('DOMContentLoaded', route);
+
+/* ---------- findings ---------- */
+(function findings() {
+  const A = R.arena.attacks, ix = k => KS.indexOf(k);
+  $('#f-q1-intro').textContent = 'In a simulated world of 50 honest sources, an attacker adds Sybil sources that all push the same wrong answer on 30 targeted claims. Each method turns source behaviour into weights. A weighted vote then decides each claim, and that vote stands in for an agent using the score.';
+  const t = $('#f-heat');
+  t.append(el('thead', null, el('tr', null, el('th', null, 'Scoring method'), ATK.map(k => el('th', { style: 'text-align:center' }, arena.ATTACKS[k].label)))));
+  const tb = el('tbody');
+  MID.forEach(m => {
+    const tr = el('tr', null, el('td', null, LABEL[m]));
+    ATK.forEach(k => { const v = A[k].methods[m].flipAt; tr.append(el('td', { class: 'heat h' + level(v) }, flipText(v, KS))); });
+    tb.append(tr);
+  });
+  t.append(tb);
+
+  const a8 = (k, m) => A[k].methods[m].accT[ix(8)];
+  const pts = $('#f-q1-points');
+  const flipN = A.farm.methods.none.flipAt;
+  const dc = R.arena.contested.decor;
+  const aud = R.arena.auditSweep;
+  const clean = A.farm.methods;
+  pts.append(
+    el('p', null, 'Plain majority breaks with ' + flipN + ' Sybils. They answer every targeted claim, while honest sources answer about half of all claims, so a small farm outvotes the honest voters on exactly those claims.'),
+    el('p', null, 'Citation rank and truth discovery do worse than no tool. With 8 copy-farm Sybils, accuracy on the targeted claims is ' + f2(a8('farm', 'pagerank')) + ' for citation rank and ' + f2(a8('farm', 'truth')) + ' for truth discovery, against ' + f2(a8('farm', 'none')) + ' with no tool. Both reward links and agreement, and Sybils can manufacture both. Against the sleeper attack, citation rank falls to ' + f2(a8('sleeper', 'pagerank')) + ' at 8 Sybils.'),
+    el('p', null, 'Targeted audit with an independence discount held up best. The copy farm and the sleeper never flipped it up to 128 Sybils (' + f2(A.farm.methods.anchored.accT[KS.length - 1]) + ' and ' + f2(A.sleeper.methods.anchored.accT[KS.length - 1]) + ' at 128). It broke against the decorrelated mimic at ' + flipText(A.decor.methods.anchored.flipAt, KS) + ' Sybils, with accuracy at ' + f2(A.decor.methods.anchored.accT[ix(64)]) + '.'),
+    el('p', null, 'The cause is measurable. Its audit picks the claims where the vote is most split. Against the mimic with 64 Sybils, only ' + pct(dc[ix(64) - 1]) + ' of those picks were targeted claims, because the Sybils had made those claims look settled. At 16 Sybils the figure was ' + pct(dc[ix(16) - 1]) + '.'),
+    el('p', null, 'More random audits did not help. With 32 mimic Sybils, accuracy on targeted claims under random audit went from ' + f2(aud.audit[0]) + ' at ' + aud.audits[0] + ' audited claims to ' + f2(aud.audit[aud.audit.length - 1]) + ' at ' + aud.audits[aud.audits.length - 1] + '. The targeted design went from ' + f2(aud.anchored[0]) + ' to ' + f2(aud.anchored[3]) + ' at ' + aud.audits[3] + '. Random audits mostly sample untargeted claims, where Sybils look as accurate as an average honest source.'),
+    el('p', null, 'The protection costs something when nobody is attacking. With no Sybils, the targeted design scores ' + f2(clean.anchored.accAll[0]) + ' on all claims against ' + f2(clean.none.accAll[0]) + ' for plain majority, and it needs ground truth for ' + R.arena.params.audit + ' of ' + R.arena.params.nClaims + ' claims.')
+  );
+
+  $('#f-q3-intro').textContent = 'Change in accuracy on the targeted claims compared with the same vote using no tool, with 8 Sybils present. A minus sign means the tool left the agent worse off than having no tool.';
+  const d = $('#f-delta');
+  d.append(el('thead', null, el('tr', null, el('th', null, 'Scoring method'), ATK.map(k => el('th', { class: 'num' }, arena.ATTACKS[k].label)))));
+  const db = el('tbody');
+  MID.filter(m => m !== 'none').forEach(m => {
+    const tr = el('tr', null, el('td', null, LABEL[m]));
+    ATK.forEach(k => {
+      const v = a8(k, m) - a8(k, 'none');
+      tr.append(el('td', { class: 'num' }, (v >= 0.005 ? '+' : v <= -0.005 ? '−' : '±') + Math.abs(v).toFixed(2)));
+    });
+    db.append(tr);
+  });
+  d.append(db);
+
+  $('#f-q2-intro').textContent = 'Ten attacks were run against five levels of verifier, and an untouched log was checked at every level as a control. A check mark means that verifier caught the attack. Insider attacks assume the attacker holds the log owner’s signing key.';
+  renderMatrix($('#f-matrix'), R.ledger);
+  const q2 = $('#f-q2-points');
+  q2.append(
+    el('p', null, 'A hash chain alone catches only a naive edit. Signatures catch anyone without the key who repairs the hashes. Co-signing catches an insider who rewrites an agreement, and also catches a rewrite of anything before the agreement, because the counterparty signed content that includes the previous hash.'),
+    el('p', null, 'Witness checkpoints are the only thing that catches an insider rewriting or cutting records after the last agreement. They also leave a gap. Attacks A4 and A10 touch records newer than the last checkpoint, and no verifier here catches them. How often the witness signs sets how much an insider can quietly change.'),
+    el('p', null, 'The cost is small. On the build machine each record took ' + R.ledger.perf.appendMsPerRecord + ' ms to hash and sign and ' + R.ledger.perf.verifyMsPerRecord + ' ms to check (Node ' + R.ledger.perf.runtime + ').'),
+    el('p', null, 'As far as I know, common trace and log formats treat records as plain editable data, with no chain, signature, counterparty signature or witness. I did not audit those standards for this sprint, so treat that comparison as a hypothesis to check.')
+  );
+
+  const sp = R.meter.specimens, fm = $('#f-meter'); const keys = Object.keys(sp);
+  $('#f-q4-intro').textContent = 'Share of claim-bearing sentences that carry an evidence pointer, in three invented specimens that stand in for the three domains named in the brief.';
+  keys.forEach(k => { const s = sp[k]; fm.append(el('div', { style: 'margin-bottom:16px' }, el('div', { style: 'display:flex;justify-content:space-between;gap:12px;margin-bottom:6px;flex-wrap:wrap' }, el('b', null, s.label), el('span', { class: 'muted' }, s.claims + ' claim-bearing sentences, ' + pct(s.boundShare) + ' with evidence attached')), stackBar(s.counts, s.claims))); });
+  fm.append(keyline());
+  $('#f-q4-caveat').textContent = 'These percentages describe my three specimens, which I wrote. They say nothing about the real domains. The meter matched my labels on ' + R.meter.dev.ok + ' of ' + R.meter.dev.n + ' development sentences and ' + R.meter.heldout.ok + ' of ' + R.meter.heldout.n + ' held-out sentences, but I wrote those knowing the rules, so this checks that the code does what I meant and not that it generalizes. Answering the track question needs a real corpus and human labels.';
+})();
+
+function renderMatrix(t, M) {
+  t.textContent = '';
+  t.append(el('thead', null, el('tr', null, el('th', null, 'Attack'), el('th', null, 'Attacker'), M.layers.map(l => el('th', { style: 'text-align:center' }, l.short)))));
+  const tb = el('tbody');
+  M.rows.forEach(r => {
+    const tr = el('tr', null, el('td', null, r.id + '  ' + r.label), el('td', null, el('span', { class: 'chip ' + (r.who === 'insider' ? 'insider' : '') }, r.who)));
+    r.caught.forEach(c => tr.append(el('td', { class: c ? 'yes' : 'no', 'aria-label': c ? 'caught' : 'not caught' }, c ? 'caught' : 'missed')));
+    tb.append(tr);
+  });
+  const ctl = el('tr', null, el('td', { style: 'font-style:italic' }, 'Control: untouched log'), el('td', null, el('span', { class: 'chip' }, 'none')));
+  M.controlPass.forEach(ok => ctl.append(el('td', { class: ok ? 'yes' : 'no' }, ok ? 'passes' : 'false alarm')));
+  tb.append(ctl);
+  t.append(tb);
+}
+
+function stackBar(counts, claims) {
+  const wrap = el('div', { class: 'stack', role: 'img', 'aria-label': 'Evidence attached ' + counts.bound + ', checkable without pointer ' + counts.bindable + ', too vague ' + counts.vague + ', opinion or forecast ' + counts.opinion });
+  ['bound', 'bindable', 'vague', 'opinion'].forEach(c => { if (counts[c]) wrap.append(el('span', { class: 's-' + c, style: 'flex:' + counts[c] + ' 1 0', title: counts[c] })); });
+  return wrap;
+}
+function keyline() {
+  const k = el('div', { class: 'keyline' });
+  [['bound', 'Evidence attached', '--c-bound'], ['bindable', 'Checkable, no pointer', '--c-bindable'], ['vague', 'Too vague to bind', '--c-vague'], ['opinion', 'Opinion or forecast', '--c-opinion']].forEach(x => k.append(el('span', null, el('i', { style: 'background:var(' + x[2] + ')' }), x[1])));
+  return k;
+}
+
+/* ---------- arena ---------- */
+const aState = { attack: 'decor', audit: 40, data: null, live: false, seq: 0 };
+(function arenaInit() {
+  const sel = $('#a-attack');
+  ATK.forEach(k => sel.append(el('option', { value: k }, arena.ATTACKS[k].label)));
+  sel.value = aState.attack;
+  sel.addEventListener('change', () => { aState.attack = sel.value; arenaUpdate(); });
+  const rg = $('#a-audit');
+  rg.addEventListener('input', () => { $('#a-audit-v').textContent = rg.value; });
+  rg.addEventListener('change', () => { aState.audit = +rg.value; arenaUpdate(); });
+  $('#a-run').addEventListener('click', () => { aState.audit = +rg.value; arenaCompute(true); });
+  $('#m-attacks').append(...ATK.map(k => el('li', null, el('b', null, arena.ATTACKS[k].label + '. '), arena.ATTACKS[k].desc)));
+  arenaUpdate();
+})();
+function arenaUpdate() {
+  $('#a-desc').textContent = arena.ATTACKS[aState.attack].desc;
+  if (aState.audit === R.arena.params.audit) { aState.data = R.arena.attacks[aState.attack]; aState.live = false; $('#a-status').textContent = 'Showing the build run, 30 seeds.'; arenaRender(); }
+  else arenaCompute(false);
+}
+function arenaCompute(forced) {
+  const my = ++aState.seq;
+  $('#a-status').textContent = 'Running…'; $('#a-run').disabled = true;
+  setTimeout(() => {
+    const p = Object.assign({}, arena.DEFAULTS, { audit: aState.audit });
+    const sw = arena.sweep(p, arena.ATTACKS[aState.attack], KS, 12, MID);
+    for (const m of MID) sw.methods[m].flipAt = arena.costToFlip(sw.methods[m].accT, KS, 0.5);
+    if (my !== aState.seq) return;
+    aState.data = sw; aState.live = true; $('#a-run').disabled = false;
+    $('#a-status').textContent = 'Live run in this browser, 12 seeds, ' + aState.audit + ' audited claims.';
+    arenaRender();
+  }, 30);
+}
+function arenaRender() {
+  const d = aState.data;
+  const series = MID.map(m => ({ id: m, label: LABEL[m], vals: d.methods[m].accT, se: d.methods[m].accTse, flip: d.methods[m].flipAt }));
+  lineChart($('#a-chart'), KS, series);
+  const lg = $('#a-legend'); lg.textContent = '';
+  series.forEach(s => lg.append(el('li', null, el('span', { class: 'sw' + (s.id === 'none' ? ' dash' : ''), style: 'border-top-color:' + COLORV[s.id] }), el('span', null, s.label + ' · flips at ' + flipText(s.flip, KS)))));
+  const t = $('#a-table'); t.textContent = '';
+  t.append(el('thead', null, el('tr', null, el('th', null, 'Method'), KS.map(k => el('th', { class: 'num' }, k + ' Sybils')))));
+  const tb = el('tbody');
+  series.forEach(s => tb.append(el('tr', null, el('td', null, s.label), s.vals.map(v => el('td', { class: 'num' }, f2(v))))));
+  t.append(tb);
+  $('#a-note').textContent = 'Accuracy of the weighted vote on the 30 targeted claims. Below 0.50 the vote is wrong on most of them. The horizontal axis steps through the Sybil counts evenly, so distances are not to scale.';
+}
+function lineChart(host, xs, series) {
+  host.textContent = '';
+  const W = Math.max(320, Math.min(680, host.clientWidth || 680)), H = W < 480 ? 300 : 330, ml = 44, mr = 18, mt = 14, mb = 44, iw = W - ml - mr, ih = H - mt - mb;
+  const X = i => ml + (xs.length === 1 ? iw / 2 : i * iw / (xs.length - 1)), Y = v => mt + (1 - v) * ih;
+  const NS = 'http://www.w3.org/2000/svg';
+  const s = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Accuracy on targeted claims versus number of Sybil sources, one line per scoring method' });
+  [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+    svg.append(s('line', { x1: ml, x2: W - mr, y1: Y(v), y2: Y(v), style: 'stroke:var(--line);stroke-width:' + (v === 0.5 ? 1.4 : 1) + (v === 0.5 ? ';stroke-dasharray:5 4' : '') }));
+    const tx = s('text', { x: ml - 8, y: Y(v) + 4, 'text-anchor': 'end', style: 'fill:var(--muted);font:11px var(--mono)' }); tx.textContent = v.toFixed(2); svg.append(tx);
+  });
+  const half = s('text', { x: W - mr - 2, y: Y(0.5) - 5, 'text-anchor': 'end', style: 'fill:var(--muted);font:11px var(--sans)' }); half.textContent = 'vote wrong below this line'; svg.append(half);
+  xs.forEach((x, i) => { const tx = s('text', { x: X(i), y: H - 22, 'text-anchor': 'middle', style: 'fill:var(--muted);font:11px var(--mono)' }); tx.textContent = x; svg.append(tx); });
+  const xt = s('text', { x: ml + iw / 2, y: H - 5, 'text-anchor': 'middle', style: 'fill:var(--muted);font:11.5px var(--sans)' }); xt.textContent = 'Sybil sources added'; svg.append(xt);
+  const order = series.slice().sort((a, b) => (a.id === 'none') - (b.id === 'none'));
+  order.forEach(sr => {
+    const dash = sr.id === 'none' ? ';stroke-dasharray:6 4' : '';
+    svg.append(s('polyline', { points: sr.vals.map((v, i) => X(i) + ',' + Y(v)).join(' '), style: 'fill:none;stroke:' + COLORV[sr.id] + ';stroke-width:' + (sr.id === 'anchored' ? 2.8 : 2) + ';stroke-linejoin:round;stroke-linecap:round' + dash }));
+    sr.vals.forEach((v, i) => svg.append(s('circle', { cx: X(i), cy: Y(v), r: 4, style: 'fill:' + COLORV[sr.id] + ';stroke:var(--surface);stroke-width:2' })));
+  });
+  const cross = s('line', { x1: 0, x2: 0, y1: mt, y2: mt + ih, style: 'stroke:var(--muted);stroke-width:1;opacity:0' }); svg.append(cross);
+  const hit = s('rect', { x: ml - 10, y: mt, width: iw + 20, height: ih, style: 'fill:transparent' }); svg.append(hit);
+  host.append(svg);
+  const tip = el('div', { class: 'tip', style: 'display:none' }); host.append(tip);
+  function show(ev) {
+    const r = svg.getBoundingClientRect(), scale = W / r.width, px = (ev.clientX - r.left) * scale;
+    let best = 0, bd = 1e9; xs.forEach((x, i) => { const dd = Math.abs(X(i) - px); if (dd < bd) { bd = dd; best = i; } });
+    cross.setAttribute('x1', X(best)); cross.setAttribute('x2', X(best)); cross.style.opacity = 1;
+    tip.textContent = ''; tip.append(el('b', null, xs[best] + ' Sybils'));
+    series.slice().sort((a, b) => b.vals[best] - a.vals[best]).forEach(sr => tip.append(el('div', { class: 'r' }, el('span', null, el('i', { style: 'background:' + COLORV[sr.id] }), sr.label), el('span', null, f2(sr.vals[best])))));
+    tip.style.display = 'block';
+    const bx = (X(best) / scale), tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(bx + 12, 4), Math.max(4, r.width - tw - 4)) + 'px'; tip.style.top = '10px';
+  }
+  function hide() { tip.style.display = 'none'; cross.style.opacity = 0; }
+  hit.addEventListener('pointermove', show); hit.addEventListener('pointerdown', show); hit.addEventListener('pointerleave', hide);
+}
+
+/* ---------- ledger ---------- */
+const L = { base: null, cur: null, attack: null, layer: 4, busy: false };
+const short = h => (h || '').slice(0, 8);
+async function ledgerInit() {
+  const sel = $('#l-attack');
+  ledger.ATTACKS.forEach(a => sel.append(el('option', { value: a.id }, a.id + '  ' + a.label + ' (' + a.who + ')')));
+  const seg = $('#l-layers');
+  ledger.LAYERS.forEach((ly, i) => seg.append(el('button', { type: 'button', 'aria-pressed': i === L.layer ? 'true' : 'false', title: ly.label, 'data-i': i }, ly.short)));
+  seg.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; L.layer = +b.dataset.i; seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); ledgerRender(); });
+  renderMatrix($('#l-matrix'), R.ledger);
+  $('#l-apply').addEventListener('click', async () => { L.attack = sel.value; await ledgerApply(); });
+  $('#l-reset').addEventListener('click', async () => { L.attack = null; await ledgerApply(); });
+  $('#l-anchor').addEventListener('click', async () => {
+    await ledger.checkpoint(L.base.ctx.witness, 'Buyer', L.base.chain);
+    L.base.receipts = L.base.ctx.witness.log.slice(); await ledgerApply();
+  });
+  $('#l-rerun').addEventListener('click', async () => {
+    const st = $('#l-rerun-status'); st.textContent = 'Running…';
+    const M = await ledger.runMatrix(); renderMatrix($('#l-matrix'), M);
+    const same = JSON.stringify(M.rows.map(r => r.caught)) === JSON.stringify(R.ledger.rows.map(r => r.caught)) && JSON.stringify(M.controlPass) === JSON.stringify(R.ledger.controlPass);
+    st.textContent = same ? 'Matches the build run: all ' + M.rows.length + ' attacks give the same result.' : 'Differs from the build run.';
+  });
+  L.base = await ledger.buildScenario(5); await ledgerApply();
+}
+async function ledgerApply() {
+  const b = L.base;
+  L.cur = { chain: ledger.clone(b.chain), receipts: ledger.clone(b.receipts), registry: b.registry, witnessPub: b.witnessPub };
+  if (L.attack) { const a = ledger.ATTACKS.find(x => x.id === L.attack); await a.run(L.cur, b.ctx); }
+  await ledgerRender();
+}
+async function ledgerRender() {
+  const cfg = ledger.LAYERS[L.layer].cfg, v = await ledger.verify(L.cur, cfg);
+  const bySeq = {}; v.failures.forEach(f => { (bySeq[f.seq] = bySeq[f.seq] || []).push(f.reason); });
+  const box = $('#l-chain'); box.textContent = '';
+  L.cur.chain.forEach((r, i) => {
+    const txt = r.body.text || (r.body.tool + ': ' + r.body.result);
+    const row = el('div', { class: 'rec' + (bySeq[i] ? ' bad' : '') }, el('span', { class: 'sq' }, '#' + i), el('span', null, el('span', { class: 'chip' }, r.kind)), el('span', { class: 'tx' }, txt),
+      el('span', { class: 'hs' }, 'hash ' + short(r.hash) + ' · prev ' + short(r.prev) + (r.cosig ? ' · co-signed by ' + r.cosig.by : '')));
+    if (bySeq[i]) row.append(el('span', { class: 'why' }, [...new Set(bySeq[i])].join('. ')));
+    box.append(row);
+  });
+  const extra = v.failures.filter(f => f.seq >= L.cur.chain.length);
+  const vd = $('#l-verdict'); vd.textContent = ''; vd.className = 'verdict';
+  const lname = ledger.LAYERS[L.layer].label;
+  if (!v.ok) { vd.classList.add('bad'); vd.append(el('b', null, 'Tampering detected. '), v.failures.length + (v.failures.length === 1 ? ' problem' : ' problems') + ' found by: ' + lname + '.'); if (extra.length) vd.append(el('div', { style: 'margin-top:4px' }, extra[0].reason + ' (checkpoint at position ' + extra[0].seq + ').')); }
+  else if (L.attack) { vd.classList.add('slip'); vd.append(el('b', null, 'Attack not detected. '), 'The log passes every check in: ' + lname + '.'); }
+  else { vd.classList.add('pass'); vd.append(el('b', null, 'Log is intact. '), 'Passes every check in: ' + lname + '.'); }
+  $('#l-receipts').textContent = L.cur.receipts.length ? 'Witness checkpoints: ' + L.cur.receipts.map(r => 'position ' + r.seq + ' (head ' + short(r.head) + ')').join(', ') + '. Records after the last checkpoint are only protected by the other checks.' : 'No witness checkpoints yet.';
+}
+ledgerInit();
+
+/* ---------- meter ---------- */
+(function meterInit() {
+  const pick = $('#m-pick'), ta = $('#m-text');
+  Object.keys(meter.SPECIMENS).forEach(k => pick.append(el('option', { value: k }, meter.SPECIMENS[k].label)));
+  pick.append(el('option', { value: 'custom' }, 'Your own text'));
+  const NAMES = { bound: 'Evidence attached', bindable: 'Checkable, no pointer', vague: 'Too vague to bind', opinion: 'Opinion or forecast', procedural: 'Procedural' };
+  function run() {
+    const a = meter.analyze(ta.value), out = $('#m-out'); out.textContent = '';
+    if (!a.items.length) { out.append(el('p', { class: 'muted' }, 'Paste some text to see how much of it can be tied to evidence.')); return; }
+    out.append(el('div', { class: 'stat' },
+      el('div', null, el('b', null, pct(a.boundShare)), el('span', null, 'evidence attached')),
+      el('div', null, el('b', null, pct(a.bindableShare)), el('span', null, 'checkable, no pointer')),
+      el('div', null, el('b', null, pct(a.vagueShare + a.opinionShare)), el('span', null, 'vague, opinion or forecast')),
+      el('div', null, el('b', null, a.claims), el('span', null, 'claim-bearing sentences'))));
+    out.append(stackBar(a.counts, a.claims), keyline());
+    const list = el('div', { style: 'margin-top:14px' });
+    a.items.forEach(i => list.append(el('div', { class: 'sent' }, el('span', null, el('span', { class: 'chip c-' + i.cls }, NAMES[i.cls])), el('span', null, i.text))));
+    out.append(list);
+  }
+  pick.addEventListener('change', () => { if (pick.value !== 'custom') ta.value = meter.SPECIMENS[pick.value].text; run(); });
+  ta.addEventListener('input', () => { pick.value = 'custom'; run(); });
+  pick.value = 'council'; ta.value = meter.SPECIMENS.council.text; run();
+  $('#m-valid').textContent = 'Checked against my own labels: ' + R.meter.dev.ok + ' of ' + R.meter.dev.n + ' sentences from the three specimens, and ' + R.meter.heldout.ok + ' of ' + R.meter.heldout.n + ' held-out sentences. I wrote the rules and the sentences, so this is a code check and not a measure of accuracy on real documents.';
+  $('#m-perf').textContent = 'Measured in Node ' + R.ledger.perf.runtime + ' on the build machine: ' + R.ledger.perf.appendMsPerRecord + ' ms per record to hash and sign, ' + R.ledger.perf.verifyMsPerRecord + ' ms per record to verify (' + R.ledger.perf.records + ' records).';
+})();
+})();
+</script>
